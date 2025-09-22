@@ -1,0 +1,2432 @@
+from tkinter import *
+from tkinter import ttk, messagebox,simpledialog
+import tkinter as tk
+from tkinter.ttk import Combobox
+import calendar
+from datetime import datetime, timedelta
+import json
+
+class UserLogin: #Ng Xiao Yean
+    USER_FILE = "USER_FILE.txt"  # File name as a constant
+    
+    def __init__(self, base):
+        self.base = base
+        self.base.title("User Login Session")
+        self.base.geometry("800x400")
+
+        # Main title
+        tk.Label(self.base, text="Welcome to Login User System!", font=("Arial", 30, "bold"), anchor="center").pack(pady=10)
+
+        # Login frame
+        self.login_frame = tk.Frame(self.base)
+        self.login_frame.pack(pady=50)
+
+        tk.Label(self.login_frame, text="Email Account:", font=("Arial", 14)).grid(row=0, column=0, pady=5)
+        self.email_entry = tk.Entry(self.login_frame, font=("Arial", 14))
+        self.email_entry.grid(row=0, column=1, pady=5)
+
+        tk.Label(self.login_frame, text="Password       :", font=("Arial", 14)).grid(row=1, column=0, pady=5)
+        self.password_entry = tk.Entry(self.login_frame, font=("Arial", 14), show="*")
+        self.password_entry.grid(row=1, column=1, pady=5)
+
+        # BooleanVar to track checkbox state
+        self.show_password_var = tk.BooleanVar()
+
+        # show or hide password
+        self.show_password_checkbox = tk.Checkbutton(self.login_frame, text="Show Password", variable=self.show_password_var, command=self.show_login_password)
+        self.show_password_checkbox.grid(row=2, column=0, pady=4)
+
+        # Login and Register buttons with improved styling
+        tk.Button(self.login_frame, text="Login", font=("Arial", 12), command=self.login, width=20, height=2).grid(row=3, column=1, pady=10, padx=10, sticky="ew")
+
+        tk.Button(self.login_frame, text="Register", font=("Arial", 12), command=self.show_register, width=20, height=2).grid(row=3, column=0, pady=10, padx=10, sticky="ew")
+
+        # Register Frame (Initially Hidden)
+        self.register_frame = tk.Frame(self.base)
+
+    def show_register(self):
+        """Show the registration frame."""
+        self.login_frame.pack_forget()
+        self.register_frame.pack(pady=50)
+
+        # Add new account
+        tk.Label(self.register_frame, text="New Account", font=("Arial", 14)).grid(row=0, column=0, pady=5)
+        self.new_email_entry = tk.Entry(self.register_frame, font=("Arial", 14))
+        self.new_email_entry.grid(row=0, column=1, pady=5)
+
+        tk.Label(self.register_frame, text="Password", font=("Arial", 14)).grid(row=1, column=0, pady=5)
+        self.new_password_entry = tk.Entry(self.register_frame, font=("Arial", 14), show="*")
+        self.new_password_entry.grid(row=1, column=1, pady=5)
+
+        tk.Label(self.register_frame, text="Re-enter Password", font=("Arial", 14)).grid(row=2, column=0, pady=5)
+        self.sec_password_entry = tk.Entry(self.register_frame, font=("Arial", 14), show="*")
+        self.sec_password_entry.grid(row=2, column=1, pady=5)
+
+        # Show or hide password
+        self.show_register_password_var = tk.BooleanVar()
+        self.show_register_password_checkbox = tk.Checkbutton(self.register_frame, text="Show Password", variable=self.show_register_password_var, command=self.show_register_password)
+        self.show_register_password_checkbox.grid(row=4, column=0, pady=5)
+
+        # Create Account and Back buttons
+        tk.Button(self.register_frame, text="Create Account", font=("Arial", 12), command=self.register, width=20, height=2).grid(row=5, column=1, pady=10, padx=10, sticky="ew")
+        tk.Button(self.register_frame, text="Back", font=("Arial", 12), command=self.show_login, width=20, height=2).grid(row=5, column=0, pady=10, padx=10, sticky="ew")
+
+    def show_login(self):
+        """Show the login frame."""
+        self.register_frame.pack_forget()
+        self.login_frame.pack(pady=50)
+
+    def login(self):
+        """Login with email and password."""
+        email = self.email_entry.get().strip()
+        password = self.password_entry.get().strip()    
+
+        if self.login_check(email, password):
+            logged_in_email = email
+            #Hide login window after logged in
+            self.base.withdraw()
+
+            # Open main menu after logged in
+            mainmenu_mainwindow = tk.Tk()
+            mainmenu(mainmenu_mainwindow, logged_in_email)  # Create a new root window for the calendar
+
+    def register(self):
+        """Register a new user."""
+        email = self.new_email_entry.get().strip()
+        password = self.new_password_entry.get().strip()
+        sec_password = self.sec_password_entry.get().strip()
+
+        # Validate account input(email and password and re-enter password)
+        if not email:
+            messagebox.showerror("Error", "Email cannot be empty.")
+            return
+        elif not password or not sec_password:
+            messagebox.showerror("Error", "Password cannot be empty.")
+            return
+        
+        # check email format
+        if not self.validation_email(email):
+            messagebox.showerror("Error", "Invalid email format. Please enter a valid email address.")
+            return
+        
+        # check password is it morethan 8 character
+        if len(password) < 8:
+            messagebox.showerror("Error", "Password must be at least 8 characters.")
+            return
+        
+        # check password is it same with re-enter poassword
+        if password != sec_password:
+            messagebox.showerror("Error", "Passwords do not match. Please try again.")
+            return
+
+        # Attempt to add the user
+        if self.add_user(email, password):
+            messagebox.showinfo("Registration Success", f"User {email} registered successfully!")
+            self.show_login()
+        else:
+            messagebox.showerror("Error", "Email already exists. Please use another email.")
+
+    def show_login_password(self):
+        """Toggle the password visibility based on the checkbox."""
+        if self.show_password_var.get():
+            self.password_entry.config(show="")
+        else:
+            self.password_entry.config(show="*")
+
+    def show_register_password(self):
+        """Toggle the password visibility based on the checkbox."""
+        if self.show_register_password_var.get():
+            self.new_password_entry.config(show="")
+            self.sec_password_entry.config(show="")
+        else:
+            self.new_password_entry.config(show="*")
+            self.sec_password_entry.config(show="*")
+
+    def validation_email(self,email):
+        """Check if the email is valid."""
+        if "@" not in email or "." not in email:
+            return False  # Invalid email format
+        
+        parts = email.split("@")
+        if len(parts) != 2:
+            return False  # Only contain one @
+
+        front, behind = parts
+        if not front or not behind:
+            return False
+
+        if "." not in behind:
+            return False
+
+        valid_end = ["com", "gov", "edu"]
+        behind_parts = behind.split(".")
+        if behind_parts[-1] not in valid_end:
+            return False
+        
+        if not all(c.isalnum() or c == "." for c in behind):
+            return False
+
+        return True
+
+    def login_check(self, email, password): 
+        """Check login username and password."""
+        users_account = self.load_file()
+
+        if email in users_account:
+            if users_account[email] == password:
+                messagebox.showinfo("Success", f"Logged in successfully! Welcome, {email}!")
+                return True
+            else:
+                messagebox.showerror("Error", "Invalid username or password. Please try again.")
+        else:
+            messagebox.showerror("Error", "Account doesn't exist.")
+            self.show_login()
+            return False
+
+    def load_file(self):
+        """Load usernames and passwords from a file."""
+        users_account = {}
+        try:
+            with open(self.USER_FILE, "r") as file:
+                for line in file:
+                    line = line.strip()
+                    if line and "|" in line:
+                        stored_user, stored_password = line.split("|", 1)
+                        users_account[stored_user] = stored_password
+        except FileNotFoundError:
+            return {}
+        return users_account
+
+    def add_user(self,email, password):
+        """Add a new user to the file."""
+        users_account = self.load_file()
+        if email in users_account:
+            return False
+        
+        try:
+            with open(self.USER_FILE, "a") as file:
+                file.write(f"{email}|{password}\n")  # Use '|' as delimiter
+            return True
+        except Exception as file_error:
+            messagebox.showerror("Error", f"An error occurred: {file_error}")
+            return False
+
+class mainmenu: #Ng Jhie Ying
+ 
+    def __init__(self,mainmenu_mainwindow,logged_in_email):
+        self.logged_in_user = logged_in_email
+        self.mainmenu_mainwindow = mainmenu_mainwindow
+        self.mainmenu_mainwindow.title("Main Menu")
+        self.mainmenu_mainwindow.geometry("450x450")
+
+        # Main menu label
+        self.label_mainmenu = Label(mainmenu_mainwindow, text="Select where you want to access:", font=("Arial", 20, "bold"))
+        self.label_mainmenu.pack(pady=30)
+
+        # Go to Calendar
+        self.cal_menu = Button(mainmenu_mainwindow, text="Calendar", font=("Arial", 15), command=lambda: self.open_calendar(logged_in_email), width=20)
+        self.cal_menu.pack(pady=10)
+
+        # Go to To-Do List
+        self.todo_menu = Button(mainmenu_mainwindow, text="To do list", font=("Arial", 15), command=lambda: self.open_todo_list(logged_in_email), width=20)
+        self.todo_menu.pack(pady=10)
+
+        # Go to Expense Tracker
+        self.exp_menu = Button(mainmenu_mainwindow, text="Expense Tracker", font=("Arial", 15), command=lambda: ExpenseTracker(mainmenu_mainwindow), width=20)
+        self.exp_menu.pack(pady=10)
+    
+    def open_calendar(self, logged_in_email):
+        # self.mainmenu_mainwindow.withdraw()
+        """Open the calendar window when the button is pressed."""
+        calendar_window = tk.Toplevel(self.mainmenu_mainwindow)
+        calendar_window.title("Calendar Application")
+        calendar_window.geometry("1100x850")  # Adjust as needed
+        CalendarApp(calendar_window, logged_in_email)
+
+    def open_todo_list(self,logged_in_email):
+        """Open the to-do list window."""
+        TodoList(logged_in_email)
+
+    def open_expense_tracker(self):
+        """Open the expense tracker window when the button is pressed."""
+        self.mainmenu_mainwindow.withdraw()  # Hide the main menu window
+        expense_window = tk.Toplevel(self.mainmenu_mainwindow)  # Create a new window
+        expense_window.title("Expense Tracker")
+        expense_window.geometry("600x400")  # Adjust as needed
+        ExpenseTracker(expense_window)
+
+class ExpenseTracker: #Ng Jhie Ying
+    def __init__(self, expense_mainwindow):
+        self.expense_mainwindow = tk.Toplevel()
+        self.expense_mainwindow.title("Expense Tracker & Budget Manager")
+        self.expense_mainwindow.geometry("510x510")
+
+        # dictionary for storing
+        self.expenses = []
+        self.categories = ["Food", "Entertainment", "Transport", "Utilities"]
+        self.accounts = ["Cash", "TnG", "Bank", "Credit Card"]
+        self.selected_expense_index = None
+        self.monthly_budgets = {}
+        self.expenses_by_month = {}
+        self.selected_month = None
+
+        self.load_data()
+        self.expense_mainpage()
+
+    def load_data(self):
+        try:
+            with open('expenses_data.json', 'r') as file:
+                data = json.load(file)
+                self.expenses = data.get("expenses", [])
+                self.monthly_budgets = data.get("monthly_budgets", {})
+        except FileNotFoundError:
+            self.expenses = []
+            self.monthly_budgets = {}
+
+    def save_file(self):
+        data = {
+            "expenses": self.expenses,
+            "monthly_budgets": self.monthly_budgets
+        }
+        with open('expenses_data.json', 'w') as file:
+            json.dump(data, file, indent=4)
+
+    def expense_mainpage(self):
+        self.clear_screen()
+
+        # Budget section buttons
+        budget_label = Label(self.expense_mainwindow, text="Budget Manager", font=("Arial", 15))
+        budget_label.grid(row=0, column=0, columnspan=2, pady=10)
+
+        set_budget_button = Button(self.expense_mainwindow, text="Set Monthly Budget", command=self.show_set_budget_page)
+        set_budget_button.grid(row=1, column=0, pady=10, padx=20, sticky="ew")
+
+        show_budget_button = Button(self.expense_mainwindow, text="Show Budget Status", command=self.show_budget_status)
+        show_budget_button.grid(row=1, column=1, pady=10, padx=20, sticky="ew")
+
+        # Expenses List section
+        title_label = Label(self.expense_mainwindow, text="Expenses List", font=("Arial", 15))
+        title_label.grid(row=2, column=0, columnspan=2, pady=10)
+
+        list_frame = Frame(self.expense_mainwindow)
+        list_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
+
+        scrollbar = Scrollbar(list_frame, orient=VERTICAL)
+        scrollbar.pack(side=RIGHT, fill=Y)
+
+        self.expense_listbox = Listbox(list_frame, width=40, height=8, yscrollcommand=scrollbar.set)
+        self.expense_listbox.pack(side=LEFT, fill=BOTH, expand=True)
+        scrollbar.config(command=self.expense_listbox.yview)
+
+        def on_select_expense(event):
+            selected_index = self.expense_listbox.curselection()
+            if selected_index:
+                self.selected_expense_index = selected_index[0]
+            else:
+                self.selected_expense_index = None
+
+        self.expense_listbox.bind('<<ListboxSelect>>', on_select_expense)
+
+        if self.expenses:
+            for expense in self.expenses:
+                self.expense_listbox.insert(END, f"{expense['date']} | {expense['category']} | {expense['account']} | RM{expense['amount']:.2f}")
+
+        # Action buttons
+        button_frame = Frame(self.expense_mainwindow)
+        button_frame.grid(row=4, column=0, columnspan=2, pady=10)
+
+        show_details_button = Button(button_frame, text="Show Details", command=self.show_expense_details, width=20, height=2, bg="#D1A7F7", fg="white")
+        show_details_button.grid(row=0, column=0, padx=10, pady=5, sticky="ew")
+
+        add_button = Button(button_frame, text="Add Expense", command=self.show_add_expense_page, width=20, height=2)
+        add_button.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+
+        edit_button = Button(button_frame, text="Edit Expense", command=self.show_edit_expense_page, width=20, height=2)
+        edit_button.grid(row=0, column=2, padx=10, pady=5, sticky="ew")
+
+        delete_button = Button(button_frame, text="Delete Expense", command=self.delete_expense, width=20, height=2, bg="#f44336", fg="white")
+        delete_button.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+
+        manage_button = Button(button_frame, text="Manage Categories & Accounts", command=self.show_manage_category_account, width=20, height=2)
+        manage_button.grid(row=1, column=1, padx=10, pady=5, sticky="ew", columnspan=2)
+
+    def delete_expense(self):
+        """Delete the selected expense."""
+        selected_expense_index = self.expense_listbox.curselection()
+
+        if selected_expense_index:
+            selected_expense = self.expenses[selected_expense_index[0]]
+            confirmation = messagebox.askyesno(
+                "Delete Expense", 
+                f"Are you sure you want to delete the expense: {selected_expense['category']} - RM{selected_expense['amount']:.2f}?"
+            )
+
+            if confirmation:
+                # Remove the expense from the list
+                self.expenses.pop(selected_expense_index[0])  # Remove using pop
+                self.update_expense_list()  # Update the listbox
+                messagebox.showinfo("Success", "Expense deleted successfully.")
+                # Save the updated data to the file
+                self.save_file()
+        else:
+            messagebox.showwarning("No Selection", "Please select an expense to delete.")
+
+    def update_expense_list(self):
+        """Update the listbox with the current expenses."""
+        self.expense_listbox.delete(0, tk.END)
+        for expense in self.expenses:
+            self.expense_listbox.insert(tk.END, f"{expense['date']} | {expense['category']} | {expense['account']} | RM{expense['amount']:.2f}")
+
+    def show_set_budget_page(self):
+        self.clear_screen()
+        """show set budget page"""
+        label_budget = Label(self.expense_mainwindow, text="Set your monthly budget:", font=("Arial", 12))
+        label_budget.pack(pady=5)
+
+        input_budget = Entry(self.expense_mainwindow)
+        input_budget.pack(pady=5)
+
+        year_label = Label(self.expense_mainwindow, text="Select Year:")
+        year_label.pack()
+
+        self.year_combobox = Combobox(self.expense_mainwindow, values=list(range(2024, 2031)))
+        self.year_combobox.pack()
+
+        month_label = Label(self.expense_mainwindow, text="Select Month:")
+        month_label.pack()
+
+        self.month_combobox = Combobox(self.expense_mainwindow, values=list(range(1, 13)))
+        self.month_combobox.pack()
+
+        def set_budget():
+            """set budget year and month"""
+            try:
+                year = int(self.year_combobox.get())
+                month = int(self.month_combobox.get())
+                budget = float(input_budget.get())
+                if budget <= 0:
+                    messagebox.showerror("Error", "Budget must be a positive number.")
+                else:
+                    if year not in self.monthly_budgets:
+                        self.monthly_budgets[year] = {}
+                    self.monthly_budgets[year][month] = budget
+                    self.expenses_by_month[(year, month)] = []  
+                    messagebox.showinfo("Success", "Budget successfully set!")
+                    self.save_file()  
+                    self.expense_mainpage()
+            except ValueError:
+                messagebox.showerror("Error", "Please enter valid inputs.")
+
+        set_button = Button(self.expense_mainwindow, text="Set Budget", command=set_budget)
+        set_button.pack(pady=10)
+
+        back_button = Button(self.expense_mainwindow, text="Back", command=self.expense_mainpage)
+        back_button.pack(pady=5)
+
+    def show_add_expense_page(self):
+        self.clear_screen()
+
+        # Title Label
+        add_expense_label = Label(self.expense_mainwindow, text="Add Expense", font=("Arial", 16))
+        add_expense_label.pack(pady=10)
+
+        # Input Frame for better organization
+        input_frame = Frame(self.expense_mainwindow)
+        input_frame.pack(padx=20, pady=10)
+
+        # Year Selection
+        year_label = Label(input_frame, text="Year:")
+        year_label.grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        self.dlyear = Combobox(input_frame, values=list(range(2024, 2031)))
+        self.dlyear.grid(row=0, column=1, padx=5, pady=5)
+
+        # Month Selection
+        month_label = Label(input_frame, text="Month:")
+        month_label.grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        self.dlmonth = Combobox(input_frame, values=list(range(1, 13)))
+        self.dlmonth.grid(row=1, column=1, padx=5, pady=5)
+
+        # Day Selection
+        day_label = Label(input_frame, text="Day:")
+        day_label.grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        self.dlday = Combobox(input_frame)
+        self.dlday.grid(row=2, column=1, padx=5, pady=5)
+
+        # Category Selection
+        category_label = Label(input_frame, text="Category:")
+        category_label.grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        category_combobox = Combobox(input_frame, values=self.categories)
+        category_combobox.grid(row=3, column=1, padx=5, pady=5)
+
+        # Amount Input
+        amount_label = Label(input_frame, text="Amount (RM):")
+        amount_label.grid(row=4, column=0, padx=5, pady=5, sticky="e")
+        amount_entry = Entry(input_frame)
+        amount_entry.grid(row=4, column=1, padx=5, pady=5)
+
+        # Account Selection
+        account_label = Label(input_frame, text="Account:")
+        account_label.grid(row=5, column=0, padx=5, pady=5, sticky="e")
+        account_combobox = Combobox(input_frame, values=self.accounts)
+        account_combobox.grid(row=5, column=1, padx=5, pady=5)
+
+        # Remarks Input
+        remarks_label = Label(input_frame, text="Remarks:")
+        remarks_label.grid(row=6, column=0, padx=5, pady=5, sticky="e")
+        remarks_entry = Entry(input_frame)
+        remarks_entry.grid(row=6, column=1, padx=5, pady=5)
+
+        # Update days based on year and month selection
+        def update_days(event=None):
+            if self.dlyear.get() and self.dlmonth.get():
+                year = int(self.dlyear.get())
+                month = int(self.dlmonth.get())
+                days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+                if month == 2 and (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)):
+                    days_in_month[1] = 29
+
+                max_day = days_in_month[month - 1]
+                self.dlday['values'] = list(range(1, max_day + 1))
+
+        self.dlyear.bind("<<ComboboxSelected>>", update_days)
+        self.dlmonth.bind("<<ComboboxSelected>>", update_days)
+
+        # Add expense function
+        def add_expense():
+            try:
+                year = self.dlyear.get()
+                month = self.dlmonth.get()
+                day = self.dlday.get()
+                category = category_combobox.get()
+                account = account_combobox.get()
+
+                if not year:
+                    messagebox.showerror("Error", "Please select a year.")
+                    return
+                if not month:
+                    messagebox.showerror("Error", "Please select a month.")
+                    return
+                if not day:
+                    messagebox.showerror("Error", "Please select a day.")
+                    return
+                if not category:
+                    messagebox.showerror("Error", "Please select a category.")
+                    return
+                if not account:
+                    messagebox.showerror("Error", "Please select an account.")
+                    return
+
+                amount = float(amount_entry.get())
+
+                selected_date = f"{year}/{month}/{day}"
+
+                self.expenses.append({
+                    'date': selected_date,
+                    'amount': amount,
+                    'category': category,
+                    'account': account,
+                    'remarks': remarks_entry.get(),
+                })
+
+                self.save_file()
+                self.expense_mainpage()
+            except ValueError:
+                messagebox.showerror("Error", "Invalid amount entered.")
+
+        # Action Buttons
+        button_frame = Frame(self.expense_mainwindow)
+        button_frame.pack(pady=10)
+
+        add_button = Button(button_frame, text="Add Expense", command=add_expense)
+        add_button.grid(row=0, column=1, padx=10)
+
+        back_button = Button(button_frame, text="Cancel", command=self.expense_mainpage)
+        back_button.grid(row=0, column=0, padx=10)
+
+    def show_budget_status(self):
+        '''show budget status'''
+        self.clear_screen()
+
+        status_label = Label(self.expense_mainwindow, text="Budget Status", font=("Arial", 16))
+        status_label.pack(pady=10)
+
+        year_label = Label(self.expense_mainwindow, text="Select Year:")
+        year_label.pack()
+
+        year_combobox = Combobox(self.expense_mainwindow, values=list(range(2024, 2031)))
+        year_combobox.pack()
+
+        month_label = Label(self.expense_mainwindow, text="Select Month:")
+        month_label.pack()
+
+        month_combobox = Combobox(self.expense_mainwindow, values=list(range(1, 13)))
+        month_combobox.pack()
+
+        def show_status():
+            try:
+                year = int(year_combobox.get())
+                month = int(month_combobox.get())
+
+                budget = self.monthly_budgets.get(year, {}).get(month, None)
+
+                if budget is None:
+                    messagebox.showerror("Error", "No budget set for this month.")
+                else:
+                    expenses_for_month = [
+                        expense for expense in self.expenses if expense['date'].startswith(f"{year}/{month}")
+                    ]
+                    total_expenses = sum(expense['amount'] for expense in expenses_for_month)
+
+                    remaining_budget = budget - total_expenses
+
+                    status_message = f"Budget: RM{budget:.2f}\n"
+                    status_message += f"Total Expenses: RM{total_expenses:.2f}\n"
+                    status_message += f"Remaining Budget: RM{remaining_budget:.2f}"
+
+                    status_label = Label(self.expense_mainwindow, text=status_message)
+                    status_label.pack(pady=10)
+
+            except ValueError:
+                messagebox.showerror("Error", "Please select both year and month.")
+
+        show_button = Button(self.expense_mainwindow, text="Show Status", command=show_status)
+        show_button.pack(pady=10)
+
+        back_button = Button(self.expense_mainwindow, text="Back", command=self.expense_mainpage)
+        back_button.pack(pady=5)
+
+    def show_expense_details(self):
+        '''show details'''
+        self.clear_screen()
+        if not self.expenses:
+            messagebox.showerror("Error", "No expenses to show details!")
+            self.expense_mainpage()  # Go back to the main page after showing error
+            return
+
+        if self.selected_expense_index is None:
+            messagebox.showerror("Error", "Please select an expense to view details.")
+            self.expense_mainpage()  # Go back to the main page after showing error
+            return
+
+        expense = self.expenses[self.selected_expense_index]
+        details = f"\n{'=' * 40}\nDate: {expense['date']}\nCategory: {expense['category']}\nAccount: {expense['account']}\nAmount: RM{expense['amount']:.2f}\nRemarks: {expense['remarks']}\n{'=' * 40}\n"
+        details_label = Label(self.expense_mainwindow, text=details, justify=LEFT)
+        details_label.pack(pady=10)
+
+        back_button = Button(self.expense_mainwindow, text="Back", command=self.expense_mainpage)
+        back_button.pack(pady=10)
+
+    def show_edit_expense_page(self):
+        # Clear the window
+        self.clear_screen()
+
+        # Title Label
+        edit_expense_label = Label(self.expense_mainwindow, text="Edit Expense", font=("Arial", 16))
+        edit_expense_label.pack(pady=10)
+
+        # Check if there are any expenses to edit
+        if not self.expenses:
+            messagebox.showerror("Error", "No expenses to edit!")
+            self.expense_mainpage()
+            return
+
+        # Create a frame for the expense selection
+        selection_frame = Frame(self.expense_mainwindow)
+        selection_frame.pack(pady=10, padx=20)
+
+        # Expense Options Combobox
+        expense_label = Label(selection_frame, text="Select Expense:")
+        expense_label.grid(row=0, column=0, padx=5, pady=5, sticky="e")
+
+        expense_options = [
+            f"{exp['category']} | {exp['account']} | RM{exp['amount']:.2f} | {exp['remarks']}"
+            for exp in self.expenses
+        ]
+        expense_combobox = Combobox(selection_frame, values=expense_options, width=40)
+        expense_combobox.grid(row=0, column=1, padx=5, pady=5)
+
+        # Edit Button Functionality
+        def edit_selected_expense():
+            selected_index = expense_combobox.current()
+            if selected_index == -1:
+                messagebox.showerror("Error", "Please select an expense to edit.")
+                return
+
+            # Retrieve the selected expense and its index
+            selected_expense = self.expenses[selected_index]
+
+            # Clear the window and display editable fields
+            self.clear_screen()
+            self.edit_expense_form(selected_expense, selected_index)
+
+        # Buttons for actions
+        button_frame = Frame(self.expense_mainwindow)
+        button_frame.pack(pady=10)
+
+        edit_button = Button(button_frame, text="Edit", command=edit_selected_expense)
+        edit_button.grid(row=0, column=1, padx=10)
+
+        back_button = Button(button_frame, text="Back", command=self.expense_mainpage)
+        back_button.grid(row=0, column=0, padx=10)
+
+    def edit_expense_form(self, expense, selected_index):
+        # Title Label
+        title_label = Label(self.expense_mainwindow, text="Edit Expense Details", font=("Arial", 16))
+        title_label.pack(pady=10)
+
+        # Form Frame
+        form_frame = Frame(self.expense_mainwindow)
+        form_frame.pack(pady=10, padx=20)
+
+        # Amount Field
+        amount_label = Label(form_frame, text="Amount (RM):", anchor="w")
+        amount_label.grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        amount_entry = Entry(form_frame, width=30)
+        amount_entry.insert(0, expense['amount'])
+        amount_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        # Category Field
+        category_label = Label(form_frame, text="Category:", anchor="w")
+        category_label.grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        category_combobox = Combobox(form_frame, values=self.categories, width=27)
+        category_combobox.set(expense['category'])
+        category_combobox.grid(row=1, column=1, padx=5, pady=5)
+
+        # Account Field
+        account_label = Label(form_frame, text="Account:", anchor="w")
+        account_label.grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        account_combobox = Combobox(form_frame, values=self.accounts, width=27)
+        account_combobox.set(expense['account'])
+        account_combobox.grid(row=2, column=1, padx=5, pady=5)
+
+        # Remarks Field
+        remarks_label = Label(form_frame, text="Remarks:", anchor="w")
+        remarks_label.grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        remarks_entry = Entry(form_frame, width=30)
+        remarks_entry.insert(0, expense['remarks'])
+        remarks_entry.grid(row=3, column=1, padx=5, pady=5)
+
+        # Action Buttons Frame
+        button_frame = Frame(self.expense_mainwindow)
+        button_frame.pack(pady=15)
+
+        # Update Function
+        def update_expense():
+            try:
+                # Validate inputs
+                updated_amount = float(amount_entry.get())
+                updated_category = category_combobox.get()
+                updated_account = account_combobox.get()
+                updated_remarks = remarks_entry.get()
+
+                if not updated_category:
+                    messagebox.showerror("Error", "Category cannot be empty.")
+                    return
+                if not updated_account:
+                    messagebox.showerror("Error", "Account cannot be empty.")
+                    return
+
+                # Update the selected expense
+                self.expenses[selected_index] = {
+                    'amount': updated_amount,
+                    'category': updated_category,
+                    'account': updated_account,
+                    'remarks': updated_remarks,
+                    'date': expense['date'],  # Keep the original date
+                }
+
+                # Save updates and return to the main page
+                self.save_file()
+                messagebox.showinfo("Success", "Expense updated successfully!")
+                self.expense_mainpage()
+
+            except ValueError:
+                messagebox.showerror("Error", "Invalid amount entered. Please enter a numeric value.")
+
+        # Save and Back Buttons
+        save_button = Button(button_frame, text="Save Changes", command=update_expense)
+        save_button.grid(row=0, column=1, padx=10)
+
+        back_button = Button(button_frame, text="Cancel", command=self.expense_mainpage)
+        back_button.grid(row=0, column=0, padx=10)
+
+    def show_manage_category_account(self):
+        # Clear the window before showing manage categories and accounts page
+        self.clear_screen()
+
+        manage_label = Label(self.expense_mainwindow, text="Manage Categories and Accounts", font=("Arial", 16))
+        manage_label.pack(pady=10)
+
+        # Create a frame to hold the categories and accounts section side by side
+        manage_frame = Frame(self.expense_mainwindow)
+        manage_frame.pack(pady=10)
+
+        # Category frame
+        category_frame = Frame(manage_frame)
+        category_frame.grid(row=0, column=0, padx=10)
+
+        category_label = Label(category_frame, text="Categories:")
+        category_label.grid(row=0, column=0)
+        category_listbox = Listbox(category_frame)
+        category_listbox.grid(row=1, column=0)
+        for cat in self.categories:
+            category_listbox.insert(END, cat)
+
+        category_entry = Entry(category_frame)
+        category_entry.grid(row=2, column=0, pady=5)
+        add_category_button = Button(category_frame, text="Add Category", command=lambda: self.add_category(category_entry, category_listbox))
+        add_category_button.grid(row=3, column=0, pady=5)
+        delete_category_button = Button(category_frame, text="Delete Category", command=lambda: self.delete_category(category_listbox))
+        delete_category_button.grid(row=4, column=0, pady=5)
+
+        # Account frame
+        account_frame = Frame(manage_frame)
+        account_frame.grid(row=0, column=1, padx=10)
+
+        account_label = Label(account_frame, text="Accounts:")
+        account_label.grid(row=0, column=0)
+        account_listbox = Listbox(account_frame)
+        account_listbox.grid(row=1, column=0)
+        for acc in self.accounts:
+            account_listbox.insert(END, acc)
+
+        account_entry = Entry(account_frame)
+        account_entry.grid(row=2, column=0, pady=5)
+        add_account_button = Button(account_frame, text="Add Account", command=lambda: self.add_account(account_entry, account_listbox))
+        add_account_button.grid(row=3, column=0, pady=5)
+        delete_account_button = Button(account_frame, text="Delete Account", command=lambda: self.delete_account(account_listbox))
+        delete_account_button.grid(row=4, column=0, pady=5)
+        back_button = Button(self.expense_mainwindow, text="Back", command=self.expense_mainpage)
+        back_button.pack(pady=10)
+
+    def load_category(self):
+        """Load category from a file."""
+        try:
+            with open("category.txt", "r") as file:
+                self.categories = [line.strip() for line in file if line.strip()]
+        except FileNotFoundError:
+                self.categories = ["Food", "Transport", "Entertainment", "Tuition Fee", "Gift"]
+
+    def add_category(self, category_entry, category_listbox):
+        """Add a new category provided by the user."""
+        category = category_entry.get().strip()
+        if not category:
+            messagebox.showwarning("Input Error", "Category cannot be empty!")
+            return
+        
+        if category not in self.categories:
+            self.categories.append(category)
+            category_listbox.insert(END, category)
+            messagebox.showinfo("Success", f"Category '{category}' added successfully!")
+        else:
+            messagebox.showwarning("Duplicate Category", f"Category '{category}' already exists!")
+
+    def save_categories_to_file(self):
+        """Save the current categories to a file."""
+        try:
+            with open("category.txt", "w") as file:
+                for category in self.categories:
+                    file.write(f"{category}\n")
+        except IOError:
+            messagebox.showerror("Error", "Unable to save categories to file.")
+
+    def delete_category(self, category_listbox):
+        selected_index = category_listbox.curselection()
+        if selected_index:
+            selected_category = category_listbox.get(selected_index)
+            self.categories.remove(selected_category)
+            category_listbox.delete(selected_index)
+        else:
+            messagebox.showerror("Error", "Please select a category to delete.")
+
+    def add_account(self, account_entry, account_listbox):
+        account = account_entry.get().strip()
+        if not account:
+            messagebox.showwarning("Input Error", "Category cannot be empty!")
+            return
+        if account and account not in self.accounts:
+            self.accounts.append(account)
+            account_listbox.insert(END, account)
+            account_entry.delete(0, END)
+        elif account in self.accounts:
+            messagebox.showwarning("Warning", "Account already exists!")
+
+    def delete_account(self, account_listbox):
+        selected_index = account_listbox.curselection()
+        if selected_index:
+            selected_account = account_listbox.get(selected_index[0])
+            self.accounts.remove(selected_account)
+            account_listbox.delete(selected_index[0])
+        else:
+            messagebox.showerror("Error", "Please select an account to delete.")
+
+    def get_selected_month(self):
+        # Return the selected month or None if no month is selected
+        return self.selected_month
+
+    def clear_screen(self):
+        for widget in self.expense_mainwindow.winfo_children():
+            widget.destroy()
+
+class CalendarApp: #Ng Xiao Yean
+    def __init__(self, base, logged_in_email):
+        self.create_event_and_invitation_files()
+
+        # for widget in base.winfo_children():
+        #     widget.destroy()
+        self.logged_in_user = logged_in_email
+        now = datetime.now()
+        self.year = now.year
+        self.month = now.month
+        self.selected_date = now.strftime("%d/%m/%Y")
+        self.events = {}  # Dictionary to store events keyed by date (DD-MM-YYYY)
+        self.selected_button = None # Track the currently selected button
+        
+        self.read_events_daily()  # Load events from file
+        
+        self.base = base
+        self.base.title("Calendar Application")
+        self.base.geometry("1100x850")  # Set the window size
+
+        # Create tab bar
+        self.tab_control = ttk.Notebook(self.base)
+        self.tab_control.pack(expand=1, fill="both")
+
+        # Create frames for each tab
+        self.create_frames()
+
+        # Show initial monthly calendar
+        self.show_monthly_calendar()
+
+    def create_frames(self):
+        """Create frames for each tab."""
+        # Monthly calendar tab
+        self.monthly_tab = tk.Frame(self.tab_control)
+        self.tab_control.add(self.monthly_tab, text="Monthly Calendar")
+
+        # Weekly calendar tab
+        self.weekly_tab = tk.Frame(self.tab_control)
+        self.tab_control.add(self.weekly_tab, text="Weekly Calendar")
+
+        # Daily calendar tab
+        self.daily_tab = tk.Frame(self.tab_control)
+        self.tab_control.add(self.daily_tab, text="Daily Calendar")
+
+        # Show events invitation tab
+        self.invitation_tab = tk.Frame(self.tab_control)
+        self.tab_control.add(self.invitation_tab, text="Events Invitation")
+
+        # Bind tab change
+        self.tab_control.bind("<<NotebookTabChanged>>", self.on_tab_change)
+
+    def on_tab_change(self, event):
+        """Update the view based on the selected tab."""
+        selected_tab = event.widget.tab(event.widget.index("current"))["text"]
+        if selected_tab == "Monthly Calendar":
+            self.show_monthly_calendar()
+        elif selected_tab == "Weekly Calendar":
+            self.show_weekly_calendar()
+        elif selected_tab == "Daily Calendar":
+            self.show_daily_calendar()
+        elif selected_tab == "Events Invitation":
+            self.show_event_invitation()
+
+    def show_event_invitation(self):
+        """Display the list of invitations for the logged-in user."""
+        invitation = self.read_invitation_events(self.logged_in_user)
+
+        # Clear the invitation tab
+        for widget in self.invitation_tab.winfo_children():
+            widget.destroy()
+
+        tk.Label(self.invitation_tab, text="Event(s) Invitation", font=("Arial", 20)).pack(pady=5)
+
+        if not invitation:
+            # If no invitations are found
+            tk.Label(
+                self.invitation_tab,
+                text="You have no pending invitations.",
+                font=("Arial", 14),
+            ).pack(pady=10)
+            return
+
+        # Iterate through the event IDs and find details in self.events
+        for event_id in invitation:
+            event_details = None
+            # Search for the event in self.events
+            for date, times in self.events.items():
+                for time, event_list in times.items():
+                    for event in event_list:
+                        if event["id"] == event_id:
+                            # Add time and date to the event details
+                            event_details = {**event, "time": time, "date": date}
+                            break
+                    if event_details:
+                        break
+                if event_details:
+                    break
+
+            # Display the invitation if the event is found
+            if event_details:
+                # Create a button for each invitation
+                button_text = f"{event_details['name']} (Host: {event_details['host']})"  # Include host name
+                event_button = tk.Button(
+                    self.invitation_tab,
+                    text=button_text,  # Display the event name and host
+                    font=("Arial", 12),
+                    command=lambda e=event_details: self.view_event_description(e, e["time"]),
+                    width=50,
+                    bg="lightblue",
+                    pady=5
+                )
+                event_button.pack(pady=5, padx=20)
+
+        # If no events are found, display a message
+        if not invitation:
+            tk.Label(
+                self.invitation_tab,
+                text="You have no pending invitations.",
+                font=("Arial", 14),
+            ).pack(pady=10)
+
+    # ----------------Daily Calendar Functions-------------------
+
+    def show_monthly_calendar(self):
+        """Display the calendar for the current month and year."""
+        # Clear the monthly tab
+        for widget in self.monthly_tab.winfo_children():
+            widget.destroy()
+
+        tk.Label(self.monthly_tab, text="Monthly Calendar", font=("Arial", 20)).pack(pady=5)
+
+        # Create title and navigation
+        self.create_month_navigation(self.monthly_tab)
+
+        # Add weekday headers and days
+        calendar_frame = tk.Frame(self.monthly_tab)
+        calendar_frame.pack(pady=20)
+ 
+        self.add_weekday_headers(calendar_frame)
+        self.add_monthly_day_buttons(calendar_frame)
+
+    #---------For choosing the month -----------------------------
+    def create_month_navigation(self, monthly_tab):
+        """Create navigation buttons for the monthly calendar."""
+        title_frame = tk.Frame(monthly_tab)
+        title_frame.pack(pady=20, anchor="center")
+
+        # Configure grid layout for title_frame to manage vertical positioning
+        title_frame.grid_columnconfigure(0, weight=1)
+        title_frame.grid_columnconfigure(1, weight=3)
+        title_frame.grid_columnconfigure(2, weight=1)
+        title_frame.grid_columnconfigure(3, weight=1)
+
+        # Left arrow button to navigate months
+        ttk.Button(title_frame, text="<", command=lambda: self.control_month(-1), width=6).grid(row=0, column=0, padx=10)
+
+        # Label showing the current year and month
+        self.title_label = ttk.Label(
+            title_frame, text=f" {self.year} / {self.month}", font=("Arial", 18), width=15, anchor="center"
+        )
+        self.title_label.grid(row=0, column=1, padx=10)
+
+        # Right arrow button to navigate months
+        ttk.Button(title_frame, text=">", command=lambda: self.control_month(1), width=6).grid(row=0, column=2, padx=10)
+
+        # Create a new frame for "Select Year" and "Manage Event" buttons
+        button_frame = tk.Frame(monthly_tab)
+        button_frame.pack(pady=10, anchor="center")
+
+        # Add "Select Year" button
+        ttk.Button(button_frame, text="Select Year", command=self.select_year, width=12).pack(side=tk.LEFT, padx=20)
+
+        # Add "Manage Event" button
+        ttk.Button(button_frame, text="Manage Event", command=lambda: self.manage_event(self.selected_date), width=15).pack(side=tk.LEFT, padx=20)
+
+
+    def add_weekday_headers(self, calendar_frame):
+        """Add weekday headers (Mon, Tue, etc.) to the calendar."""
+        for i, day in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
+            tk.Label(calendar_frame, text=day, font=("Arial", 14, "bold"), width=10).grid(row=0, column=i, padx=10, pady=10)
+
+    def add_monthly_day_buttons(self, calendar_frame):
+        """Add buttons representing days to the calendar."""
+        now = datetime.now()
+        cal = calendar.Calendar()
+        days = cal.itermonthdays2(self.year, self.month)
+        row = 1
+
+        for day, weekday in days:
+            if day == 0:
+                tk.Label(calendar_frame, text="", width=10).grid(row=row, column=weekday, padx=10, pady=10)
+            else:
+                date_str = f"{day:02}/{self.month:02}/{self.year:04}"
+                is_current_day = date_str == now.strftime("%d/%m/%Y")
+                is_selected_day = date_str == self.selected_date
+                font_style = ("Arial", 12, "bold") if is_selected_day else ("Arial", 12)
+                bg_color = self.get_day_color(day, is_current_day)
+
+                # Create a frame to hold the button and notification
+                day_frame = tk.Frame(calendar_frame, width=80, height=80)
+                day_frame.grid_propagate(False)
+                day_frame.grid(row=row, column=weekday, padx=10, pady=10)
+
+                # Define the button first
+                button = tk.Button(
+                    day_frame,
+                    text=str(day),
+                    width=10,
+                    height=3,
+                    bg=bg_color,
+                    font=font_style,
+                    command=lambda d=date_str: self.update_selection(d)  # Use day value
+                )
+                button.pack(expand=True, fill="both")
+
+                # Get user-specific events
+                user_events = self.get_user_events(date_str)
+
+                # Add a notification showing the number of events
+                if user_events:
+                    event_count = sum(len(events) for events in user_events.values())
+                    event_text = str(event_count) if event_count <= 9 else "9+"
+
+                    notification_label = tk.Label(
+                        day_frame,
+                        text=event_text,  # Show event count as notification
+                        font=("Arial", 10, "bold"),
+                        fg="white",
+                        bg="red",
+                        width=2,
+                        height=1,
+                        anchor="center",
+                    )
+                    notification_label.place(relx=0.8)  # Slightly above the button
+
+                # Move to next row after Sunday
+                if weekday == 6:
+                    row += 1
+
+    def update_selection(self, date_str):
+        """Update the selected button and date."""
+        if self.selected_button:
+            self.selected_button.configure(
+                bg=self.get_day_color(int(self.selected_button['text']), False),
+                font=("Arial", 12)
+            )
+        # Update selected date
+        if self.selected_date == date_str:
+            self.tab_control.select(self.daily_tab)
+        else:
+            self.selected_date = date_str
+
+        # Refresh the calendar to update the button's appearance
+        self.show_monthly_calendar()
+        self.show_weekly_calendar()
+
+    # ----------------Weekly Calendar Functions-------------------
+
+    def show_weekly_calendar(self):
+        """Display the weekly calendar with a similar design to the monthly calendar."""
+        # Clear the weekly tab
+        for widget in self.weekly_tab.winfo_children():
+            widget.destroy()
+
+        tk.Label(self.weekly_tab, text="Weekly Calendar", font=("Arial", 20)).pack(pady=5)
+
+        # Create navigation and title
+        self.create_week_navigation(self.weekly_tab)
+
+        
+        #Manage Event button
+        action_frame = tk.Frame(self.weekly_tab)
+        action_frame.pack(pady=20)
+        ttk.Button(action_frame, text="Manage Event", command=lambda: self.manage_event(self.selected_date)).pack()
+
+
+        # Determine the start and end of the week
+        selected_date = datetime.strptime(self.selected_date, "%d/%m/%Y")
+        start_of_week = selected_date - timedelta(days=selected_date.weekday())  # Monday
+
+        # Create frame for the weekly calendar
+        calendar_frame = tk.Frame(self.weekly_tab)
+        calendar_frame.pack(pady=20)
+
+        # Add day buttons with events
+        self.add_weekly_day_buttons(calendar_frame, start_of_week)
+
+    def create_week_navigation(self, weekly_tab):
+        """Create navigation buttons for the weekly calendar."""
+        title_frame = tk.Frame(weekly_tab)
+        title_frame.pack(pady=20)
+
+        ttk.Button(title_frame, text="< Previous Week", command=lambda: self.control_week(-1), width=20).pack(side=tk.LEFT, padx=10)
+        self.week_title_label = ttk.Label(
+            title_frame,
+            text=self.get_week_title(),
+            font=("Arial", 18),
+            width=30,
+            anchor="center"
+        )
+        self.week_title_label.pack(side=tk.LEFT, padx=10)
+        ttk.Button(title_frame, text="Next Week >", command=lambda: self.control_week(1), width=20).pack(side=tk.LEFT, padx=10)
+
+    def get_week_title(self):
+        """Generate the title for the weekly calendar."""
+        selected_date = datetime.strptime(self.selected_date, "%d/%m/%Y")
+        start_of_week = selected_date - timedelta(days=selected_date.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        return f"Week: {start_of_week.strftime('%d %b %Y')} - {end_of_week.strftime('%d %b %Y')}"
+
+    def add_weekly_day_buttons(self, calendar_frame, start_of_week):
+        """Add buttons and events for the days of the week in a 7x2 grid layout."""
+        now = datetime.now()
+        current_date = start_of_week
+
+        # Configure row heights
+        calendar_frame.rowconfigure(0, minsize=150)  # Button row height
+        calendar_frame.rowconfigure(1, minsize=400)  # Event row height
+
+        for i in range(7):  # Loop through each day of the week
+            calendar_frame.columnconfigure(i, weight=1)  # Ensure columns resize evenly
+
+            date_str = current_date.strftime("%d/%m/%Y")
+            is_current_day = date_str == now.strftime("%d/%m/%Y")
+            is_selected_day = date_str == self.selected_date
+            font_style = ("Arial", 12, "bold") if is_selected_day else ("Arial", 12)
+            bg_color = self.get_day_color(current_date.day, is_current_day)
+
+            # Add the day button (first row)
+            button = tk.Button(
+                calendar_frame,
+                text=current_date.strftime("%A\n%d %b"),
+                bg=bg_color,
+                font=font_style,
+                width=15,
+                height=2,
+                command=lambda d=date_str: self.update_selection(d),
+                relief = "flat", #remove black border
+                highlightthickness=0 #hide border
+            )
+            button.grid(row=0, column=i, padx=5, pady=5, sticky="nsew")
+
+            # Add a fixed-size event box (second row)
+            event_frame = tk.Frame(calendar_frame, bg="white", relief="ridge", borderwidth=1)
+            event_frame.grid(row=1, column=i, padx=5, pady=5, sticky="nsew")
+            event_frame.grid_propagate(False)
+
+            # Scrollable canvas for events
+            canvas = tk.Canvas(event_frame, bg="white", width=150, height=400)
+            scrollbar = tk.Scrollbar(event_frame, orient="vertical", command=canvas.yview)
+            inner_frame = tk.Frame(canvas, bg="white")
+
+            inner_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            )
+            canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+
+            # Populate events
+            events = self.user_events.get(date_str, {})
+            for time, event_list in events.items():
+                for event in event_list:
+                # Add event name with a dot beside it
+                    event_frame = tk.Frame(inner_frame, bg="white")
+                    event_frame.pack(fill="x", pady=2)
+
+                    # Dot to the left of the event
+                    dot = tk.Label(event_frame, text="●", font=("Arial", 10, "bold"), fg="red", bg="white")
+                    dot.pack(side="left", padx=5)
+
+                    # Event name as a clickable label (not a button to hide the black line)
+                    label = tk.Label(
+                        event_frame,
+                        text=event["name"],  # Only display event name
+                        font=("Arial", 10),
+                        bg="white",
+                        anchor="w",
+                        cursor="hand2",  # Change cursor to hand for clickable effect
+                    )
+                    label.pack(side="left", fill="x", padx=5)
+                    label.bind("<Button-1>", lambda _,ev=event, t=time: self.view_event_description(ev,t))  # Bind click to show description
+
+            current_date += timedelta(days=1)  # Move to the next day
+
+# ----------------Daily Calendar Functions-------------------
+    def show_daily_calendar(self):
+        """Display the daily calendar with fixed one-hour intervals and extra rows for specific event times."""
+        # Clear the daily tab
+        for widget in self.daily_tab.winfo_children():
+            widget.destroy()
+
+        # Add a title to the daily tab
+        tk.Label(self.daily_tab, text=f"Daily Calendar - {self.selected_date}", font=("Arial", 20)).pack(pady=5)
+
+        action_frame = tk.Frame(self.daily_tab)
+        action_frame.pack(pady=50)
+        ttk.Button(action_frame, text="Manage Event",command=lambda: self.manage_event(self.selected_date)).pack()
+        
+        # Create a frame for the time column and events
+        calendar_frame = tk.Frame(self.daily_tab)
+        calendar_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Create a scrollable frame for time and events
+        canvas = tk.Canvas(calendar_frame)
+        scrollbar = tk.Scrollbar(calendar_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>", #detect size changes
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            #is a must to carry lambda 
+        )
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Filter events for the logged-in user
+        daily_events = self.get_user_events(self.selected_date)
+
+        # Track the current row in the grid
+        row = 0
+
+        # Add rows for each hour and handle additional specific times
+        for hour in range(24):  # Loop through 24 hours
+            # Add the one-hour time slot
+            time_label = tk.Label(
+                scrollable_frame,
+                text=f"{hour:02}:00",
+                font=("Arial", 12),
+                width=8,
+                anchor="e",  # Align text to the right
+            )
+            time_label.grid(row=row, column=0, padx=5, pady=5, sticky="e")
+
+            # Placeholder for events at the one-hour slot
+            event_frame = tk.Frame(
+                scrollable_frame,
+                bg="white",
+                width=500,  # Set a fixed width for events
+            )
+            event_frame.grid(row=row, column=1, padx=5, pady=5, sticky="w")
+
+            # Check for events at the one-hour time
+            event_time = f"{hour:02}:00"
+            if event_time in daily_events:
+                hour_events = daily_events[event_time]  # Get list of events for this time slot
+                for event in hour_events:
+                    tk.Button(
+                        event_frame,
+                        text=event["name"],  # Use the event name as button text
+                        font=("Arial", 10),
+                        bg="lightblue",
+                        command=lambda e=event,t=event_time: self.view_event_description(e,t)
+                    ).pack(fill="x", pady=2)  # Add a small space between buttons
+
+            row += 1  # Increment row for the next hour
+
+            # Check for additional events within the hour (e.g., 08:10, 15:30)
+            for specific_time, specific_events in daily_events.items():
+                specific_hour, specific_minute = map(int, specific_time.split(":"))
+                if specific_hour == hour and specific_minute != 0:  # If within the current hour but not on the hour
+                    # Add a new row for the specific event time
+                    specific_time_label = tk.Label(
+                        scrollable_frame,
+                        text=specific_time,
+                        font=("Arial", 12),
+                        width=8,
+                        anchor="e",  # Align text to the right
+                    )
+                    specific_time_label.grid(row=row, column=0, padx=5, pady=5, sticky="e")
+
+                    specific_event_frame = tk.Frame(
+                        scrollable_frame,
+                        bg="white",
+                        width=500,  # Set a fixed width for events
+                    )
+                    specific_event_frame.grid(row=row, column=1, padx=5, pady=5, sticky="w")
+
+                    # Add labels for each specific event (showing only event name)
+                    for event in specific_events:
+                        tk.Label(
+                            specific_event_frame,
+                            text=event["name"],  # Show only the event name
+                            font=("Arial", 10),
+                            anchor="w",
+                            bg="lightblue",
+                        ).pack(fill="x", pady=2)
+
+                    row += 1  # Increment row for the next specific event
+
+
+    def view_event_description(self, event,time):
+        """Display a popup with the event details."""
+        # Create a new window
+        popup = tk.Toplevel(self.base)
+        popup.title("Event Details")
+        popup.geometry("400x300")
+
+        # Display event details
+        tk.Label(popup, text="Event Details", font=("Arial", 16, "bold")).pack(pady=10)
+
+        details_text = (
+            f"Name: {event['name']}\n\n"
+            f"Date: {self.selected_date}\n\n"
+            f"Time: {time}\n\n"
+            f"Description: {event['description']}\n\n"
+        )
+        tk.Label(popup, text=details_text, font=("Arial", 12), wraplength=350, justify="left").pack(pady=10)
+
+        # Add a close button
+        tk.Button(popup, text="Close", command=popup.destroy).pack(pady=10)
+    
+# ----------------Event Management-------------------
+
+    def manage_event(self, selected_date):
+        """Open a new window to manage events for a specific date."""
+        if not self.selected_date:
+            messagebox.showwarning("No Date Selected", "Please select a date first.")
+            return
+        event_window = tk.Toplevel(self.base)
+        event_window.title(f"Manage Events for {selected_date}")
+        event_window.geometry("500x500")
+
+        tk.Label(event_window, text=f"Manage Events for {selected_date}", font=("Arial", 16, "bold")).pack(pady=10)
+        events_frame = tk.Frame(event_window)
+        events_frame.pack(pady=10, fill="both", expand=True)
+
+        def refresh_events():
+            """Refresh the displayed events."""
+            for widget in events_frame.winfo_children():
+                widget.destroy()
+
+            events = self.get_user_events(selected_date)
+
+            if not events:
+                tk.Label(events_frame, text="No events scheduled.", font=("Arial", 12)).pack()
+            else:
+                for time, event_list in events.items():
+                    for event in event_list:
+                        frame = tk.Frame(events_frame)
+                        frame.pack(fill="x", pady=5)
+                        details = f"{time} - {event['name']} ({event['description']})"
+                        tk.Label(frame, text=details, font=("Arial", 12), anchor="w").pack(side="left", padx=5)
+
+                        # View,Edit,Deletebuttons
+                        tk.Button(frame, text="View", command=lambda e=event, t=time: view_event(e,t)).pack(side="right", padx=5)
+                        tk.Button(frame, text="Delete", command=lambda e=event, t=time: delete_event(e,t)).pack(side="right", padx=5)
+                        tk.Button(frame, text="Edit", command=lambda e=event, t=time: edit_event(e,t)).pack(side="right", padx=5)
+                        tk.Button(frame, text="Invite", command=lambda e=event: invite_event(e)).pack(side="right", padx=5)
+
+    
+        
+        def add_event_popup():
+            """Add a new event."""
+            popup = tk.Toplevel(event_window)
+            popup.title("Add Event")
+            popup.geometry("400x300")
+
+            tk.Label(popup, text="Time (e.g., 8:00 PM):", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+            time_entry = tk.Entry(popup, font=("Arial", 12))
+            time_entry.pack(fill="x", padx=10)
+
+            tk.Label(popup, text="Event Name:", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+            name_entry = tk.Entry(popup, font=("Arial", 12))
+            name_entry.pack(fill="x", padx=10)
+
+            tk.Label(popup, text="Description (optional):", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+            description_entry = tk.Entry(popup, font=("Arial", 12))
+            description_entry.pack(fill="x", padx=10)
+
+            def save_new_event():
+                """Save the new event."""
+                time = time_entry.get().strip()
+                name = name_entry.get().strip()
+                description = description_entry.get().strip()
+                new_event_id = self.generate_event_id()
+
+                # Validate required fields
+                if not time or not name:
+                    messagebox.showerror("Error", "Time and Event Name cannot be empty.")
+                    popup.lift()
+                    return
+
+                # Handle missing description
+                if not description:
+                    description = "-"
+
+                # Parse and normalize time
+                try:
+                    time = time.replace('.', ':').lower().replace('am', ' AM').replace('pm', ' PM')
+                    time = time.replace('  ', ' ')  # Handle extra spaces
+                    if not ":" in time:
+                        time = time.replace(' AM', ':00 AM').replace(' PM', ':00 PM')
+                    input_time = datetime.strptime(time, "%I:%M %p").strftime("%H:%M")  # Convert to 24-hour format
+                except ValueError:
+                    messagebox.showerror("Error", "Invalid time format. Use formats like 8.00 PM, 8:00 PM, or 8 PM.")
+                    popup.lift()
+                    return
+
+                # Add event to the events dictionary
+                if selected_date not in self.events:
+                    self.events[selected_date] = {}
+                if input_time not in self.events[selected_date]:
+                    self.events[selected_date][input_time] = []
+
+                self.events[selected_date][input_time].append({
+                    "id": new_event_id,
+                    "host": self.logged_in_user,
+                    "name": name,
+                    "description": description,
+                })
+
+                # Write to file and refresh UI
+                self.write_events_daily()
+                self.read_events_daily()
+                refresh_events()
+                popup.destroy()
+                event_window.lift()  # Focus the manage event window
+                self.show_monthly_calendar()
+                self.show_daily_calendar()
+                self.show_weekly_calendar()
+
+
+            ttk.Button(popup, text="Add Event", command=save_new_event).pack(pady=10)
+            ttk.Button(popup, text="Cancel", command=lambda: (popup.destroy(),event_window.lift())).pack(pady=5)
+            event_window.lift()
+            return
+
+        def view_event(event,time):
+            """Display a popup with the event details."""
+            popup = tk.Toplevel(self.base)
+            popup.title("Event Details")
+            popup.geometry("400x300")
+
+            tk.Label(popup, text="Event Details", font=("Arial", 16, "bold")).pack(pady=10)
+
+            # Display event details
+            details_text = (f"Name: {event['name']}\n\n" 
+                        f"Time: {time}\n\n" 
+                        f"Description: {event['description']}\n\n" 
+                        )
+            tk.Label(popup, text=details_text, font=("Arial", 12), wraplength=350, justify="left").pack(pady=10)
+
+            # Close button
+            tk.Button(popup, text="Close", command=lambda: (popup.destroy(),event_window.lift())).pack(pady=10)
+
+        def edit_event(event, time):
+            """Edit an existing event."""
+            popup = tk.Toplevel(event_window)
+            popup.title("Edit Event") 
+            popup.geometry("400x300")
+
+            tk.Label(popup, text="Time (e.g., 8:00 PM):", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+            time_entry = tk.Entry(popup, font=("Arial", 12))
+            time_entry.insert(0, time)
+            time_entry.pack(fill="x", padx=10)
+
+            tk.Label(popup, text="Event Name:", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+            name_entry = tk.Entry(popup, font=("Arial", 12))
+            name_entry.insert(0, event["name"])
+            name_entry.pack(fill="x", padx=10)
+
+            tk.Label(popup, text="Description:", font=("Arial", 12)).pack(anchor="w", padx=10, pady=5)
+            description_entry = tk.Entry(popup, font=("Arial", 12))
+            description_entry.insert(0, event["description"])
+            description_entry.pack(fill="x", padx=10)
+    
+            def save_edited_event():
+                """Save changes to the event."""
+                new_time = time_entry.get().strip()
+                new_name = name_entry.get().strip()
+                new_description = description_entry.get().strip()
+
+                if not new_time or not new_name:
+                    messagebox.showerror("Error", "Time and Event Name cannot be empty.")
+                    popup.lift()
+                    return
+
+                # Handle missing description
+                if not new_description:
+                    new_description = "-"
+
+                # Normalize time input
+                try:
+                    new_time = new_time.replace('.', ':').strip()
+                    if ":" in new_time and "AM" not in new_time and "PM" not in new_time:
+                        # 24-hour format
+                        new_input_time = datetime.strptime(new_time, "%H:%M").strftime("%H:%M")
+                    else:
+                        # 12-hour format
+                        new_time = new_time.lower().replace('am', ' AM').replace('pm', ' PM')
+                        if not ":" in new_time:
+                            new_time = new_time.replace(' AM', ':00 AM').replace(' PM', ':00 PM')
+                        new_input_time = datetime.strptime(new_time, "%I:%M %p").strftime("%H:%M")
+                except ValueError:
+                    messagebox.showerror("Error", "Invalid time format. Use formats like 8 PM, 08:00, or 20:00.")
+                    popup.lift()
+                    return
+
+                # Update event in the dictionary
+                self.events[selected_date][time].remove(event)  # Remove old event
+                if not self.events[selected_date][time]:  # If no events remain at this time
+                    del self.events[selected_date][time]
+
+                if selected_date not in self.events:
+                    self.events[selected_date] = {}
+                if new_input_time not in self.events[selected_date]:
+                    self.events[selected_date][new_input_time] = []
+
+                # Add updated event
+                self.events[selected_date][new_input_time].append({
+                    "id": event["id"],
+                    "host": event.get("host", self.logged_in_user),  # Retain or default to the logged-in user
+                    "name": new_name,
+                    "description": new_description,
+                })
+
+                # Save changes and refresh UI
+                self.write_events_daily()
+                refresh_events()
+                popup.destroy()
+                event_window.lift()  # Focus the manage event window
+                self.show_daily_calendar()
+                self.show_weekly_calendar()
+
+
+            ttk.Button(popup, text="Save Changes", command=save_edited_event).pack(pady=10)
+            ttk.Button(popup, text="Cancel", command=lambda: (popup.destroy(), event_window.lift())).pack(pady=5)
+
+
+        def delete_event(event, time):
+            """Delete an existing event."""
+            # Confirmation message with event details
+            confirm_message = (
+                f"Are you sure you want to delete this event?\n\n"
+                f"Name: {event['name']}\n"
+                f"Time: {time}\n"
+                f"Description: {event['description']}\n"
+            )
+            confirm = messagebox.askyesno("Confirm Delete", confirm_message)
+            
+            if confirm:
+                try:
+                    # Ensure selected_date is defined
+                    selected_date = self.selected_date
+                    if not selected_date:
+                        messagebox.showerror("Error", "No date is selected.")
+                        return
+
+                    # Validate if the event exists in the dictionary
+                    if selected_date in self.events and time in self.events[selected_date]:
+                        # Remove the specific event
+                        self.events[selected_date][time].remove(event)
+                        
+                        # Cleanup: Remove empty time slots or dates
+                        if not self.events[selected_date][time]:  # If no more events at this time
+                            del self.events[selected_date][time]
+                        if not self.events[selected_date]:  # If no more events on this date
+                            del self.events[selected_date]
+
+                        # Delete associated invitations
+                        event_id = event.get("id")  # Ensure the event has a unique 'id'
+                        if event_id:
+                            self.delete_invitations(event_id)
+
+                        # Write changes to the file and refresh UI
+                        self.write_events_daily()
+                        self.show_monthly_calendar()
+                        self.show_weekly_calendar()
+                        self.show_daily_calendar()
+                        refresh_events()  # Refresh the events list in the current window
+                        event_window.lift()  # Keep the manage event window in focus
+
+                        messagebox.showinfo("Success", "Event deleted successfully.")
+                        event_window.lift()
+
+                    else:
+                        messagebox.showerror("Error", "Event not found or already deleted.")
+                        event_window.lift()
+                
+                except Exception as e:
+                    messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
+            else:
+                event_window.lift()
+
+
+        ttk.Button(event_window, text="Add Event", command=add_event_popup).pack(pady=10)
+        ttk.Button(event_window, text="Close", command= event_window.destroy).pack(pady=10)
+
+        refresh_events()
+
+        def invite_event(event):
+            """Invite users to an existing event."""
+            popup = tk.Toplevel(event_window)
+            popup.title("Event Invitation")
+            popup.geometry("500x500")
+
+            tk.Label(
+                popup,
+                text="Enter Emails for Event Invitation (one per box):",
+                font=("Arial", 12),
+            ).pack(anchor="center", padx=10, pady=10)
+
+            # Frame to hold the email input boxes
+            input_frame = tk.Frame(popup)
+            input_frame.pack(fill="x", padx=10, pady=10)
+
+            email_entries = []  # List to hold the email entry widgets
+
+            def add_email_box():
+                """Add a new email input box."""
+                email_entry = tk.Entry(input_frame, font=("Arial", 12))
+                email_entry.pack(fill="x", padx=5, pady=5)
+                email_entries.append(email_entry)
+
+            # Add the first email box initially
+            add_email_box()
+
+            # Button to add more email boxes
+            tk.Button(popup, text="Add Another Email", command=add_email_box).pack(pady=5)
+
+            def save_invitations():
+                """Save the invitations to a file after validating the emails."""
+                emails = []
+                invalid_emails = []
+
+                # Collect and validate emails from all input boxes
+                for email_entry in email_entries:
+                    email = email_entry.get().strip()
+                    if email:
+                        if self.validate_email(email):
+                            emails.append(email)
+                        else:
+                            invalid_emails.append(email)
+
+                # Handle invalid emails
+                if invalid_emails:
+                    messagebox.showerror(
+                        "Invalid Emails",
+                        f"The following emails are invalid:\n{', '.join(invalid_emails)}",
+                    )
+                    popup.lift()
+                    return
+
+                # Check if no valid emails were entered
+                if not emails:
+                    messagebox.showerror("Error", "No valid emails entered.")
+                    return
+
+                try:
+                    # Append emails for the event ID to the file
+                    with open("invitation.txt", "a") as file:
+                        file.write(f"{event['id']}|{','.join(emails)}\n")
+
+                    messagebox.showinfo("Success", "Invitations sent successfully!")
+                    popup.destroy()
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save invitations: {e}")
+                    popup.lift()
+
+            # Add action buttons
+            tk.Button(popup, text="Send Invitations", command=save_invitations).pack(pady=10)
+            tk.Button(popup, text="Cancel", command=lambda: (popup.destroy(), event_window.lift())).pack(pady=5)
+
+            
+# --- Utilities ---
+    def select_year(self):
+        """Select year"""
+        year_window = tk.Toplevel(self.base)
+        year_window.title("Select Year")
+        year_window.geometry("600x200")
+
+        tk.Label(year_window, text="Choose a Year:", font=("Arial", 14)).pack(pady=10)
+
+        # Create a Combobox with years from 1950 to 3000
+        year_var = tk.IntVar(value=self.year)  # Default to the current year
+        year_combobox = ttk.Combobox(
+            year_window,
+            textvariable=year_var,
+            values=[str(y) for y in range(1950, 3001)],  # Populate with years
+            state="readonly",
+            font=("Arial", 12),
+            width=10,
+        )
+        year_combobox.pack(pady=10)
+
+        # Define a function to update the year
+        def set_year():
+            try:
+                selected_year = int(year_combobox.get())
+                self.year = selected_year
+                self.title_label.config(text=f"{self.year} / {self.month}")
+                self.show_monthly_calendar()
+                year_window.destroy()
+            except ValueError:
+                messagebox.showerror("Error", "Please select a valid year.")
+                year_window.lift()
+
+        def set_current_year():
+            self.year = datetime.now().year  # Set the year to the current year
+            self.month = datetime.now().month # Set the month to the current month
+            self.title_label.config(text=f"{self.year} / {self.month}")
+            self.show_monthly_calendar()
+            year_window.destroy()
+
+        # Add OK, Current Year, and Cancel buttons
+        button_frame = tk.Frame(year_window)
+        button_frame.pack(pady=20)
+
+        ttk.Button(button_frame, text="OK", command=set_year).pack(side=tk.LEFT, padx=20)
+        ttk.Button(button_frame, text="Current Date", command=set_current_year,width=20).pack(side=tk.LEFT, padx=20)
+        ttk.Button(button_frame, text="Cancel", command=year_window.destroy).pack(side=tk.LEFT, padx=20)
+        
+    def control_month(self, month_delta):
+        """Update the calendar to show the previous or next month."""
+        self.month += month_delta
+        if self.month > 12:
+            self.month = 1
+            self.year += 1
+        elif self.month < 1:
+            self.month = 12
+            self.year -= 1
+        self.title_label.config(text=f"{self.year} / {self.month}")
+        self.show_monthly_calendar()
+
+
+    def control_week(self, week_delta):
+        """Navigate to the previous or next week."""
+        selected_date = datetime.strptime(self.selected_date, "%d/%m/%Y")
+        new_date = selected_date + timedelta(weeks=week_delta)
+        self.selected_date = new_date.strftime("%d/%m/%Y")
+
+        # If the new selected date is in a different month, update the month and year
+        if new_date.month != self.month or new_date.year != self.year:
+            self.month = new_date.month
+            self.year = new_date.year
+            self.show_monthly_calendar()  # Refresh the monthly calendar view
+
+        self.show_weekly_calendar()  # Refresh the weekly calendar view
+
+        
+    def get_day_color(self, day, is_current_day):
+            """Determine the background color for a day."""
+            date_str = f"{day:02}/{self.month:02}/{self.year:04}"
+            is_selected_day = date_str == self.selected_date
+
+            if is_selected_day:
+                # Softer dark colors for the selected day
+                if is_current_day:
+                    return "#6495ED" # soft blue
+                elif date_str in self.user_events:
+                    return "#FF92A1" # soft pink
+                else:
+                    return "#A9A9A9" # soft grey
+            else:
+                # Default colors for non-selected days
+                if is_current_day:
+                    return "#ADD8E6"  # Light blue
+                elif date_str in self.user_events:
+                    return "#FFB6C1"  # Light pink
+                else:
+                    return "#D3D3D3"  # Light grey
+
+    def get_user_events(self, date):
+        """Filter events for the logged-in user for a specific date."""
+        if date not in self.events:
+            return {}
+        user_events = {}
+        #Filter process
+        for time, event_list in self.events[date].items():
+            filtered_events = [event for event in event_list if event["host"] == self.logged_in_user]
+            if filtered_events: #If TRUE
+                user_events[time] = filtered_events
+        return user_events
+    
+    def generate_event_id(self):
+        """Generate a unique event ID as a string."""
+        # Get all existing event IDs
+        all_ids = [
+            int(event["id"]) 
+            for date in self.events.values() 
+            for time_events in date.values() 
+            for event in time_events 
+            if "id" in event
+        ]
+        
+        # Find the next available ID
+        next_id = max(all_ids, default=0) + 1  # Default to 1 if no IDs exist
+        return f"{next_id:04}"  # Format as a 4-digit string
+
+    def delete_invitations(self, event_id):
+        """Delete invitations associated with a specific event."""
+        try:
+            # Read the invitations file
+            with open("invitation.txt", "r") as file:
+                lines = file.readlines()
+
+            # Filter out invitations related to the event_id
+            with open("invitation.txt", "w") as file:
+                for line in lines:
+                    if not line.startswith(f"{event_id}|"):
+                        file.write(line)
+
+        except FileNotFoundError:
+            messagebox.showerror("Error", "Invitations file not found.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete invitations: {str(e)}")
+
+
+    def filter_user_events(self):
+        """Filter events for the logged-in user and store them in self.user_events."""
+        self.user_events = {}  # Initialize the dictionary to store filtered events
+
+
+        for date, times in self.events.items():
+            for time, event_list in times.items():
+                for event in event_list:
+                    if event["host"] == self.logged_in_user: #Filter the host event only
+                        if date not in self.user_events:
+                            self.user_events[date] = {}
+                        if time not in self.user_events[date]:
+                            self.user_events[date][time] = []
+
+                        # Add the event to the filtered events
+                        self.user_events[date][time].append(event)
+
+    def read_invitation_events(self, user_email):
+        invited_events = []
+
+        try:
+            with open("invitation.txt", "r") as file:
+                for line in file:
+                    line = line.strip()
+                    if line:  # Ensure the line is not empty
+                        parts = line.split("|")
+                        if len(parts) != 2:
+                            print(f"Skipping invalid line: {line}")
+                            continue
+
+                        event_id, invitees = parts
+                        invitees_list = invitees.split(",")  # Split invitees into a list
+                        if user_email in invitees_list:  # Check if the username is in the invitees
+                            invited_events.append(event_id)
+        except FileNotFoundError:
+            print(f"File not found: invitation.txt")
+        except Exception as e:
+            print(f"Error reading invitation file: {e}")
+        
+        return invited_events
+
+    def write_events_daily(self):
+            """Write the events dictionary to a file."""
+            try:
+                with open("event.txt", "w") as file:
+                    for date, times in self.events.items():
+                        for time, event_list in times.items():
+                            for event in event_list:
+                                # Write the event details
+                                print(event) 
+                                file.write(
+                                    f"{event['id']}|{event['host']}|{date}|{time}|{event['name']}|"
+                                    f"{event['description']}\n"
+                                )
+                print("Events saved successfully.")
+            except Exception as e:
+                print(f"Error writing events: {e}")
+                raise
+
+    def read_events_daily(self):
+        """Read events from a file and populate the events dictionaries."""
+        self.events = {}  # To store all events
+        try:
+            with open("event.txt", "r") as file:
+                for line in file:
+                    line = line.strip()
+                    if line:
+                        parts = line.split("|")
+                        if len(parts) < 6:  # Ensure all required parts are present
+                            print(f"Skipping invalid line: {line}")
+                            continue
+                        
+                        event_id, user_email, date, time, name, description = parts
+
+                        # Add event to the main dictionary
+                        if date not in self.events:
+                            self.events[date] = {}
+                        if time not in self.events[date]:
+                            self.events[date][time] = []
+                        
+                        self.events[date][time].append({
+                            "id": event_id,
+                            "host": user_email,
+                            "name": name,
+                            "description": description,
+                        })
+
+            # Filter events for the logged-in user
+            self.filter_user_events()
+
+        except FileNotFoundError:
+            print("Event file not found. Initializing empty dictionaries.")
+            self.events = {}
+        except Exception as e:
+            print(f"Error reading events: {e}")
+            raise
+
+    def create_event_and_invitation_files(self):
+        """
+        Creates event.txt and invitation.txt files if they don't exist.
+        Initializes them with appropriate headers or empty content.
+        """
+        try:
+            # Create or ensure event.txt file
+            with open("event.txt", "a") as event_file:
+                event_file.write("")  # Write an empty string or initialize as needed
+            print("event.txt file created or cleared.")
+            
+            # Create or ensure invitation.txt file
+            with open("invitation.txt", "a") as invitation_file:
+                invitation_file.write("")  # Write an empty string or initialize as needed
+            print("invitation.txt file created or cleared.")
+        except Exception as e:
+            print(f"Error creating files: {e}")
+
+    def validate_email(self, email):
+        """Validate email address format manually."""
+        if "@" not in email or "." not in email:
+            return False  # Must contain '@' and '.'
+
+        local_part, domain_part = email.rsplit("@", 1)
+        if not local_part or not domain_part:  # Ensure both parts are present
+            return False
+
+        if "." not in domain_part:  # Domain part must contain a '.'
+            return False
+
+        valid_domains = ["com", "gov", "edu"]  # Allowable domain suffixes
+        domain_suffix = domain_part.split(".")[-1]
+        if domain_suffix not in valid_domains:
+            return False
+
+        return True
+
+class TodoList: #Ng Jia Min
+    def __init__(self,logged_in_email):
+        self.user = logged_in_email
+        self.tasks = []  # Initialize task storage
+        self.descriptions = {}
+        self.deadlines = {}
+        self.categories = {}
+        self.mainpage()
+
+    def mainpage(self):
+        window = Toplevel()
+        window.title("To-Do List")
+        window.geometry("400x500")
+
+        # Frame for each page
+        frame_today_page = Frame(window)
+        frame_today_page.pack(fill='both', expand=True)  # Changed from grid to pack
+
+        # Create function for different pages
+        def show_frame(frame):
+            frame.tkraise()
+
+        def today_page():
+            show_frame(frame_today_page)
+
+        # TODAY PAGE
+        # Title
+        lbl_today = Label(frame_today_page, text="TO-DO LIST", font="Arial 20 bold")
+        lbl_today.pack(pady=10)  # Changed from grid to pack
+
+        # Entry box
+        self.task = StringVar()
+        entryTask = Entry(frame_today_page, textvariable=self.task, width=35)
+        entryTask.pack(pady=5)  # Changed from grid to pack
+
+        # Button frame
+        button_frame = Frame(frame_today_page)
+        button_frame.pack(pady=5)
+
+        # Buttons
+        btAddTask = Button(button_frame, text="Add", command=self.TaskEnter, width=10)
+        btAddTask.grid(row=0, column=0, padx=2)
+
+        btDeleteTask = Button(button_frame, text="Delete", command=self.TaskDelete, width=10)
+        btDeleteTask.grid(row=0, column=1, padx=2)
+
+        btEditTask = Button(button_frame, text="Edit", command=self.TaskEdit, width=10)
+        btEditTask.grid(row=0, column=2, padx=2)
+
+        # Second row of buttons
+        btCompleteTask = Button(button_frame, text="Complete", command=self.TaskComplete, width=10, bg="yellow")
+        btCompleteTask.grid(row=1, column=2, pady=5, padx=2)
+
+        btClearTask = Button(button_frame, text="Clear", command=self.TaskClear, width=10, bg="red")
+        btClearTask.grid(row=1, column=1, pady=5, padx=2)
+
+        btDescTask = Button(button_frame, text="Details", command=self.TaskDetails, width=10, bg="light blue", fg="black")
+        btDescTask.grid(row=1, column=0, pady=5, padx=2)
+
+        # Listbox and scrollbar
+        listbox_frame = Frame(frame_today_page)
+        listbox_frame.pack(pady=10, fill='both', expand=True)
+
+        self.task_listbox = Listbox(listbox_frame, width=40, height=12, font="Arial 10 italic")
+        self.task_listbox.pack(side=LEFT, fill='both', expand=True)
+
+        self.scrollbar = Scrollbar(listbox_frame, orient=VERTICAL, command=self.task_listbox.yview)
+        self.scrollbar.pack(side=RIGHT, fill='y')
+
+        self.task_listbox.config(yscrollcommand=self.scrollbar.set)
+
+        self.load_data()
+
+        # Start with the "Today" page
+        today_page()
+       #window.mainloop()
+
+    def save_data(self):
+        try:
+            # Read existing data
+            all_data = {}
+            try:
+                with open("task_data.txt", "r") as file:
+                    for line in file:
+                        user, task_data = line.strip().split(":", 1)
+                        if user not in all_data:
+                            all_data[user] = []
+                        all_data[user].append(task_data)
+            except FileNotFoundError:
+                pass  # File might not exist yet
+
+            # Update data for the current user
+            user_data = [
+                f"{task}::{self.descriptions.get(task, '')}::{self.deadlines.get(task, '')}::{self.categories.get(task, '')}"
+                for task in self.tasks
+            ]
+            all_data[self.user] = user_data
+
+            # Write back all data to the file
+            with open("task_data.txt", "w") as file:
+                for user, tasks in all_data.items():
+                    for task_entry in tasks:
+                        file.write(f"{user}:{task_entry}\n")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save data: {e}")
+
+    def load_data(self):
+        try:
+            # Read the file and load data specific to the current user
+            with open("task_data.txt", "r") as file:
+                for line in file:
+                    user, task_data = line.strip().split(":", 1)
+                    if user == self.user:  # Only load data for the logged-in user
+                        parts = task_data.split("::")
+                        if len(parts) == 4:  # Ensure proper formatting
+                            task, description, deadline, category = parts
+                            self.tasks.append(task)
+                            self.descriptions[task] = description
+                            self.deadlines[task] = deadline
+                            self.categories[task] = category
+
+            self.update_listbox()  # Update the UI after loading data
+        except FileNotFoundError:
+            print("Task file not found. Starting with an empty task list.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load data: {e}")
+    def TaskEnter(self):
+        """Add a new task."""
+        task = self.task.get().strip()
+        if task:
+            if task in self.tasks:
+                messagebox.showerror("Duplicate task", "Task already exist, please change a task name!")
+                return
+            self.tasks.append(task)  # Add to task list
+            self.update_listbox()  # Refresh the listbox
+            self.task.set("")  # Clear the entry field
+            self.save_data()
+            self.DetailsPage(task)
+
+        else:
+            messagebox.showwarning("Input Error", "Task cannot be empty!")
+
+    def update_listbox(self):
+        """Refresh the listbox to match the tasks list."""
+        self.task_listbox.delete(0, END)
+        for index, task in enumerate(self.tasks):
+            self.task_listbox.insert(END, task)
+            if "[DONE]" in task:
+                # Set color for done tasks
+                self.task_listbox.itemconfig(index, {'fg': '#0cd846'})  # Green color for done tasks
+            if self.categories.get(task)=="Urgent":
+                self.task_listbox.itemconfig(index, {'fg': '#780606','bg':'yellow'})  # red color for done tasks    
+
+    def TaskDelete(self):
+        """Delete the selected task."""
+        selected_task=self.task_listbox.curselection()
+        if selected_task:
+            index = selected_task[0]
+            del self.tasks[index] # Remove from task list
+            self.update_listbox()  # Refresh the listbox
+            self.save_data()
+        else:
+            messagebox.showwarning("Selection Error", "No task selected!")
+
+    def TaskComplete(self):
+        '''Complete the selected task.'''
+        selected_task = self.task_listbox.curselection()  # Get the selected task
+        if selected_task:
+            index=selected_task[0]
+            current_task=self.tasks[index]
+
+            if "[DONE]" not in current_task:
+                updated_task = f"[DONE] {current_task}"  # You can adjust the format if needed
+                self.tasks[index] = updated_task  # Update the task in the list
+                self.update_listbox()  # Refresh the listbox to reflect changes
+                self.save_data()
+                #font become green when done
+                self.task_listbox.itemconfig(index, {'fg': '#0cd846'})
+            else:
+                messagebox.showwarning("Selection Error", "Current task already completed!")
+        else:
+            messagebox.showwarning("Selection Error","No Task Selected!")
+
+    def TaskEdit(self):
+        """Edit the selected task."""
+        selected_task = self.task_listbox.curselection() #selectedt_task = index
+        if selected_task:
+            index = selected_task[0]
+            current_task = self.tasks[index] #current_task = string at the specific index
+            new_task = simpledialog.askstring("Edit Task", "Update the task:", initialvalue=current_task)
+            if new_task in self.tasks:
+                messagebox.showerror("Duplicate Task","The task name already exists, please change the name!")
+                return            
+            if new_task == "":
+                messagebox.showerror("Invalid input","Task name cannot be empty! ")
+                return
+            #define new task in the tasks list
+            self.tasks[index] = new_task.strip()
+
+            if current_task in self.descriptions:
+                self.descriptions[new_task]=self.descriptions[current_task]
+                del self.descriptions[current_task]
+            if current_task in self.categories:
+                self.categories[new_task]=self.categories[current_task]
+                del self.categories[current_task]
+            if current_task in self.deadlines:
+                self.deadlines[new_task]=self.deadlines[current_task]
+                del self.deadlines[current_task]
+        
+            self.update_listbox()
+            self.save_data( )
+        else:
+            messagebox.showwarning("Selection Error", "No task selected!")
+
+    def TaskClear(self):
+        """Clear all tasks."""
+
+        if not self.tasks:
+            messagebox.showerror("Invalid action", "There is no valid task currently.")
+            return    
+        else:
+            confirm=messagebox.askyesno("Confirm", "Are you sure you want to clear all tasks?")
+            if confirm:
+                self.tasks.clear()
+                self.update_listbox()
+                self.save_data()
+
+    def UpdateDesc(self):
+        """Add a new description to the listbox."""
+        desc_text = self.description.get().strip()
+        if desc_text:  # Only add if there's text inside
+            self.desc_listbox.insert(END, desc_text)  # Add description to the listbox
+            self.description.set("")  # Clear the entry field
+        else:
+            messagebox.showwarning("Input Error", "Description cannot be empty!")
+
+    def DeleteDesc(self):
+        selected_desc=self.desc_listbox.curselection()
+        if selected_desc:
+            index=selected_desc[0]
+            self.desc_listbox.delete(index)
+            self.save_data()
+        else:
+            messagebox.showwarning("Selection Error", "No description selected!")            
+
+#Details Page
+    def TaskDetails(self, selected_task_index=None):
+        """Display edit details for the selected task."""
+        selected_task_index = self.task_listbox.curselection()
+        if selected_task_index:
+            index = selected_task_index[0]
+            task = self.tasks[index]
+            #Retrieve saved details
+            description=self.descriptions.get(task,"")
+            deadline=self.deadlines.get(task,"")
+            category=self.categories.get(task,"")
+
+            #Pass task details to details page
+            self.DetailsPage(task,description,deadline,category)
+        else:
+            messagebox.showwarning("Selection Error", "No task selected!")
+
+    def DetailsPage(self, task,description="",deadline="",category=""):
+        """Show task details and allow adding descriptions."""
+        # Create a new window to display details
+        details_page = Toplevel()
+        details_page.title("Task Details")
+        details_page.geometry("1000x600")
+
+        # Display the task
+        display_userinput = Label(details_page, text=f"Task: {task}", font="Arial 14")
+        display_userinput.grid(column=1, row=0, pady=10)
+        # Button to add description
+        btDescTask = Button(details_page, text="Add Description", command=self.UpdateDesc, width=15, bg="light blue")
+        btDescTask.grid(column=0,row=1)
+        # Button to delete description
+        btDelDesc=Button(details_page,text="Delete Description",command=self.DeleteDesc,width=15,bg="pink")
+        btDelDesc.grid(column=0,row=2)
+        #listbox frame
+        desc_frame=Frame(details_page)
+        desc_frame.grid(column=0,row=3,pady=20,padx=50,sticky="nsew")
+        # Entry box for description
+        self.description = StringVar()
+        desc_entry = Entry(desc_frame, textvariable=self.description, width=40)
+        desc_entry.grid(column=0,row=1)
+        # Listbox for displaying descriptions
+        self.desc_listbox = Listbox(desc_frame, width=40, height=15)
+        self.desc_listbox.grid(column=0,row=2)
+        # Back to main page button
+        ##back_button.grid(row=4, column=0, pady=10)
+
+        if description:
+            self.desc_listbox.delete(0,END)
+            for desc in description.split("; "):
+                self.desc_listbox.insert(END,desc)
+
+        # Label for Deadline
+        lblDate = Label(details_page, text="Deadline", bg="yellow", width=10)
+        lblDate.grid(row=1, column=1, padx=5)
+        #frame for combo box
+        cmbx_frame=Frame(details_page)
+        cmbx_frame.grid(row=3,column=1,pady=20,sticky="n",padx=50)
+        #combo box selection
+        # Year Combobox
+        current_year = datetime.now().year
+        self.dlyear = ttk.Combobox(cmbx_frame, values=list(range(current_year, current_year + 10)), width=15)
+        self.dlyear.set("Select Year")
+        self.dlyear.grid(row=0,column=0,pady=5)
+        # Month Combobox
+        self.dlmonth = ttk.Combobox(cmbx_frame, values=list(range(1, 13)), width=15)
+        self.dlmonth.set("Select Month")
+        self.dlmonth.grid(row=1, column=0, pady=5)
+        # Day Combobox
+        self.dlday = ttk.Combobox(cmbx_frame, width=15)
+        self.dlday.set("Select Day")
+        self.dlday.grid(row=2, column=0, pady=5)
+        #display selected date
+        self.show_date=Label(cmbx_frame,text=f"Deadline: {deadline or 'Not Set'}",font="Arial 10")
+        self.show_date.grid(pady=10,row=4,column=0)
+        # Bind Combobox selection to update logic
+        self.dlyear.bind("<<ComboboxSelected>>", self.update_days)
+        self.dlmonth.bind("<<ComboboxSelected>>", self.update_days)
+        self.dlday.bind("<<ComboboxSelected>>", self.get_date)
+
+        # Label for Category
+        cat_frame=Frame(details_page)
+        lblCategory = Label(details_page, text=f"Category", bg="light green", width=10)
+        lblCategory.grid(row=1, column=2, padx=80)
+        cat_frame=Frame(details_page)
+        cat_frame.grid(row=3,column=2,sticky="n",padx=50,pady=20)
+        cat_option=["Work","Personal","Family","Fitness","Learning","Hobbies","Urgent","Events"]
+        self.cat_cmbx=ttk.Combobox(cat_frame,values=cat_option)
+        self.cat_cmbx.set(category or "Select a category")
+        self.cat_cmbx.grid(row=0,column=0,pady=5)
+    
+        self.show_cat=Label(cat_frame,text=f"Category: {category or 'Not Selected'}",font="Arial 10")
+        self.show_cat.grid(row=1,column=0,pady=10)
+        
+        #Bind   
+        self.cat_cmbx.bind("<<ComboboxSelected>>",self.display_cat)
+
+        def on_close(): #automatically save changes
+            self.save_task_details(task)
+            self.update_listbox()
+            details_page.destroy()
+        details_page.protocol("WM_DELETE_WINDOW",on_close)
+
+    def save_task_details(self, task):
+        """Save the details entered by the user."""
+        descriptions =[self.desc_listbox.get(i) for i in range (self.desc_listbox.size())]
+        if descriptions:
+            description_text = "; ".join(descriptions)
+        else:
+            description_text=""
+        #Save to dictionary
+        self.descriptions[task]=description_text
+        self.deadlines[task]=self.show_date.cget("text").replace("Deadline: ","")
+        self.categories[task] = self.cat_cmbx.get()
+
+        # Now, save to file
+        self.save_data()
+
+    def display_cat(self,event=None):
+        selected_cat=self.cat_cmbx.get()
+        self.show_cat.config(text=f"Category: {selected_cat}")
+
+    def get_date(self,event=None):
+        show_year=self.dlyear.get()
+        show_month=self.dlmonth.get()
+        show_day=self.dlday.get()
+
+        if show_year.isdigit() and show_month.isdigit() and show_day.isdigit():
+            selected_date=datetime(int(show_year),int(show_month),int(show_day))
+            current_date=datetime.now().replace(hour=0,minute=0,second=0,microsecond=0)
+
+
+            if selected_date>=current_date:
+                self.show_date.config(text=f"Deadline: {show_year}-{show_month}-{show_day}")
+            else:
+                messagebox.showwarning("Invalid Date","Deadline cannot be before today!")
+                self.show_date.config(text="Invalid Date")
+        else:
+            self.show_date.config(text="Deadline: Not Set")
+
+    def update_days(self, event=None):
+        """Update the days combobox based on the selected year and month."""
+        try:
+            # Get selected year and month
+            year = int(self.dlyear.get())
+            month = int(self.dlmonth.get())
+           
+            # Calculate the number of days in the selected month
+            days_in_month = calendar.monthrange(year, month)[1]
+            self.dlday['values'] = list(range(1, days_in_month + 1))
+            self.dlday.set("Select Day")  # Reset to the first day
+
+
+        except ValueError:
+            # Handle invalid selections
+            self.dlday['values'] = []
+            self.dlday.set("Select Day")
+            self.show_date.config(text="Not Set")
+
+        #update deadline label
+        self.get_date()     
+
+
+if __name__ == "__main__":
+    base = tk.Tk()
+    app = UserLogin(base)
+    base.mainloop()
